@@ -5,7 +5,9 @@ dependencies:
   - _libgcc_mutex=0.1=main
   - _openmp_mutex=5.1=1_gnu
   - aom=3.6.0=h6a678d5_0
+  - asciitree=0.3.3=py_2
   - blas=1.0=mkl
+  - blosc=1.21.3=h6a678d5_0
   - bzip2=1.0.8=h5eee18b_6
   - ca-certificates=2024.7.2=h06a4308_0
   - cairo=1.16.0=hb05425b_5
@@ -13,6 +15,7 @@ dependencies:
   - dav1d=1.2.1=h5eee18b_0
   - expat=2.6.3=h6a678d5_0
   - farama-notifications=0.0.4=py310h06a4308_0
+  - fasteners=0.16.3=pyhd3eb1b0_0
   - ffmpeg=6.1.1=h4c62175_0
   - filelock=3.13.1=py310h06a4308_0
   - fontconfig=2.14.1=h4c34cd2_2
@@ -66,8 +69,10 @@ dependencies:
   - mpc=1.1.0=h10f8cd9_1
   - mpfr=4.0.2=hb69a4c5_1
   - mpmath=1.3.0=py310h06a4308_0
+  - msgpack-python=1.0.3=py310hd09550d_0
   - ncurses=6.4=h6a678d5_0
   - networkx=3.3=py310h06a4308_0
+  - numcodecs=0.12.1=py310h2c38b39_0
   - numpy=1.26.4=py310h5f9d8c6_0
   - numpy-base=1.26.4=py310hb5e798b_0
   - openh264=2.1.1=h4ff587b_0
@@ -81,6 +86,7 @@ dependencies:
   - pytorch=2.3.0=cpu_py310h08bb5f6_1
   - readline=8.2=h5eee18b_0
   - setuptools=72.1.0=py310h06a4308_0
+  - six=1.16.0=pyhd3eb1b0_1
   - sqlite=3.45.3=h5eee18b_0
   - sympy=1.13.2=py310h06a4308_0
   - tbb=2021.8.0=hdb19cb5_0
@@ -92,6 +98,7 @@ dependencies:
   - tzdata=2024a=h04d1e81_0
   - wheel=0.44.0=py310h06a4308_0
   - xz=5.4.6=h5eee18b_1
+  - zarr=2.13.3=py310h06a4308_0
   - zlib=1.2.13=h5eee18b_1
   - zstd=1.5.5=hc292b87_2
   - pip:

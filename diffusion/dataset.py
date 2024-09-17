@@ -10,10 +10,11 @@ class AnimeFaces(Dataset):
         self.preprocess = preprocess
 
     def __len__(self):
-        pass
+        png_files = [f for f in os.listdir(self.img_dir) if f.endswith('.png') and os.path.isfile(os.path.join(self.img_dir, f))]
+        return len(png_files)
 
     def __getitem__(self, index):
-        img_path = os.path.join(self.img_dir, str(index-1)+'.png')
+        img_path = os.path.join(self.img_dir, str(index+1)+'.png')
         img_file = Image.open(img_path)
 
         if self.preprocess != None:

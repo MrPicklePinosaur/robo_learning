@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 
 from dataset import AnimeFaces
+from unet import UNet
 
 # TODO try other noise schedules
 def linear_beta_schedule(timesteps, start=0.0001, end=0.02):
@@ -87,6 +88,7 @@ dataset = AnimeFaces(img_dir='data', preprocess=preprocess)
 dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
 # Apply forward diffusion
+'''
 image = next(iter(dataloader))[0] # grab some image
 print(image.shape)
 num_images = 10 # number of images to display in graph
@@ -102,3 +104,9 @@ for t in range(0, T, step_size):
     fig_index += 1
 
 plt.show()
+'''
+
+
+x = torch.randn(1, 3, 572, 572)
+model = UNet(in_channels=3, out_channels=3)
+model(x)

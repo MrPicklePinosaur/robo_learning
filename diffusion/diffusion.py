@@ -79,7 +79,12 @@ preprocess = transforms.Compose(transformations)
 
 dataset = AnimeFaces(img_dir='data', preprocess=preprocess)
 dataloader = DataLoader(dataset, batch_size=BATCH_SIZE)
-norm_mean, norm_std = normalize_dataset(dataloader, IMG_SIZE, IMG_SIZE)
+
+RECOMPUTE_NORMS=False
+# computed previously
+norm_mean, norm_std = [25.66350674, 12.87127401, 11.44491336], [202.07254913, 101.43154071, 90.1956577]
+if RECOMPUTE_NORMS:
+    norm_mean, norm_std = normalize_dataset(dataloader, IMG_SIZE, IMG_SIZE)
 
 # Apply the normalization transformations
 # transformations.append(transforms.Normalize(mean=norm_mean, std=norm_std))
@@ -106,7 +111,8 @@ for t in range(0, T, step_size):
 plt.show()
 '''
 
-
 x = torch.randn(1, 3, 572, 572)
-model = UNet(in_channels=3, out_channels=3)
+model = UNet(in_channels=3, out_channels=2)
+print(model)
 model(x)
+

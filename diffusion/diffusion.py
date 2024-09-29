@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
@@ -13,9 +14,10 @@ def linear_beta_schedule(timesteps, start=0.0001, end=0.02):
 
 # Hyperparameters
 IMG_SIZE=64
-BATCH_SIZE=64
+BATCH_SIZE=1
 T=300
 EPOCHS=100
+LEARING_RATE=1e-3
 
 
 '''
@@ -112,14 +114,33 @@ for t in range(0, T, step_size):
 plt.show()
 '''
 
-x = torch.randn(1, 3, 572, 572)
-timestep = torch.zeros((1, 1))
-model = UNet(in_channels=3, out_channels=2, time_dim=32)
+model = UNet(in_channels=3, out_channels=3, time_dim=BATCH_SIZE)
 print(model)
-model(x, timestep)
+# x = torch.randn(1, 3, 572, 572)
+# timestep = torch.zeros((1, 1))
+# model(x, timestep)
 
+optimizer = torch.optim.Adam(model.parameters(), lr=LEARING_RATE)
+criterion = nn.MSELoss()
 
 # Training process
-# for epoch in EPOCHS:
+for epoch in range(EPOCHS):
+    for i, batch in enumerate(dataloader):
 
+        optimizer.zero_grad()
 
+        # sample random timestep
+        t = torch.randint(0, T, (BATCH_SIZE, 1), device=device)
+
+        # TODO sample noise
+        # TODO size up to 572x572
+        e = torch.randint(0, 1, (BATCH_SIZE, 3, 256, 256), device=device)
+
+        outputs = model(e, t)
+        loss = criterion(outputs, e)
+        loss.backward()
+        optimizer.step()
+
+        # TODO log some progress
+
+    print(f'Epoch {epoch} completed')

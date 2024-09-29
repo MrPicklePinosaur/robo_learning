@@ -14,14 +14,14 @@ class UNetBlock(nn.Module):
         self.time_dim = time_dim
         self.time_transform = nn.Linear(self.time_dim, in_channels)
 
-        self.conv0 = nn.Conv2d(in_channels, in_channels, 3)
-        self.conv1 = nn.Conv2d(in_channels, out_channels, 3)
+        self.conv0 = nn.Conv2d(in_channels, in_channels, 3, padding=1)
+        self.conv1 = nn.Conv2d(in_channels, out_channels, 3, padding=1)
         self.relu = nn.ReLU()
 
         if up:
-            self.transform = nn.ConvTranspose2d(in_channels, out_channels, 2, 2)
+            self.transform = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2, padding=0)
         else:
-            self.transform = nn.MaxPool2d(2)
+            self.transform = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
 
     def forward(self, x, t, residual=None):
         # TODO when should time embedding be applied?
@@ -60,27 +60,32 @@ class UNet(nn.Module):
 
         self.time_dim = time_dim
 
-        self.time_embed = nn.Sequential(
-            PositionEmbedding(self.time_dim),
+        # TODO move the max time steps to hyperparam
+        self.time_embed = PositionEmbedding(1000, self.time_dim)
+        self.time_embed_linear = nn.Sequential(
+            nn.Flatten(),
             nn.Linear(self.time_dim, self.time_dim),
-            nn.ReLU()
+            nn.ReLU(),
         )
 
-        self.conv0 = nn.Conv2d(in_channels, down_channels[0], 3, padding=0)
+        self.conv0 = nn.Conv2d(in_channels, down_channels[0], 3, padding=1)
         self.down_blocks = nn.ModuleList([UNetBlock(down_channels[i], down_channels[i+1], self.time_dim, up=False) for i in range(len(down_channels)-1)])
         self.up_blocks = nn.ModuleList([UNetBlock(up_channels[i], up_channels[i+1], self.time_dim, up=True) for i in range(len(down_channels)-1)])
-        self.conv1 = nn.Conv2d(up_channels[-1], up_channels[-1], 3, padding=0)
-        self.output_conv = nn.Conv2d(up_channels[-1], out_channels, 1)
+        self.conv1 = nn.Conv2d(up_channels[-1], up_channels[-1], 3, padding=1)
+        self.output_conv = nn.Conv2d(up_channels[-1], out_channels, kernel_size=1)
 
 
     def forward(self, x, timestep):
 
+
         # time embedding
-        t = self.time_embed(timestep)
+        t = self.time_embed(x, timestep)
+        print('time embedding', t.shape)
+        t = self.time_embed_linear(t)
         print('time embedding', t.shape)
 
         print('initial dimension', x.shape)
-        x = self.conv0(x)
+        x = self.conv0(x.float())
         print('after conv0', x.shape)
         
         residuals = []

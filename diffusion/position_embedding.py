@@ -16,7 +16,7 @@ class PositionEmbedding(nn.Module):
         self.embedding[: , 1::2] = torch.cos(position * div)
 
     def forward(self, x, t):
-        print('dimensions', x.shape, t.shape)
+        # print('dimensions', x.shape, t.shape)
         embeds = self.embedding[t.squeeze(-1)].to(x.device)
         return embeds[:, :, None, None]
 

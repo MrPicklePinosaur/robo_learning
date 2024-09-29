@@ -2,8 +2,9 @@ import torch
 import torch.nn as nn
 import numpy as np
 import matplotlib.pyplot as plt
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
+import logging
 
 from dataset import AnimeFaces
 from unet import UNet
@@ -14,7 +15,7 @@ def linear_beta_schedule(timesteps, start=0.0001, end=0.02):
 
 # Hyperparameters
 IMG_SIZE=64
-BATCH_SIZE=1
+BATCH_SIZE=64
 T=300
 EPOCHS=100
 LEARING_RATE=1e-3
@@ -32,10 +33,8 @@ alphas_overline = torch.cumprod(alphas, axis=0)
 A = torch.sqrt(alphas_overline)
 B = torch.sqrt(1-alphas_overline)
 
-
-# TODO make this work for a batch
-# returns noisy mean, variance
-def forward_pass(x, t):
+# x is a batch of images, t is the timestep of each image to sample at
+def sample_noisy_image(x, t):
     noise = torch.randn_like(x)
     return A[t] * x + B[t] * noise, noise
 
@@ -69,6 +68,9 @@ def normalize_dataset(norm_loader, w, h):
 device = device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 
+# setup basic logger
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 # Load dataset
 
@@ -93,6 +95,7 @@ if RECOMPUTE_NORMS:
 # transformations.append(transforms.Normalize(mean=norm_mean, std=norm_std))
 preprocess = transforms.Compose(transformations)
 dataset = AnimeFaces(img_dir='data', preprocess=preprocess)
+dataset = Subset(dataset, range(BATCH_SIZE*10))
 dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
 # Apply forward diffusion
@@ -125,6 +128,8 @@ criterion = nn.MSELoss()
 
 # Training process
 for epoch in range(EPOCHS):
+
+    total_loss = 0
     for i, batch in enumerate(dataloader):
 
         optimizer.zero_grad()
@@ -133,14 +138,16 @@ for epoch in range(EPOCHS):
         t = torch.randint(0, T, (BATCH_SIZE, 1), device=device)
 
         # TODO sample noise
-        # TODO size up to 572x572
-        e = torch.randint(0, 1, (BATCH_SIZE, 3, 256, 256), device=device)
+        e, _ = sample_noisy_image(batch, t)
+        #e = torch.randint(0, 1, (BATCH_SIZE, 3, 256, 256), device=device).float()
 
         outputs = model(e, t)
         loss = criterion(outputs, e)
+        total_loss += loss.item()
         loss.backward()
         optimizer.step()
+        print(f'finished iteration {i+1}/{len(dataloader)}')
 
-        # TODO log some progress
+    # TODO log some progress and visualize
+    print(f'Completed Epoch {epoch}, Loss: {total_loss}')
 
-    print(f'Epoch {epoch} completed')

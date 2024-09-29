@@ -2,6 +2,9 @@ from position_embedding import PositionEmbedding
 import torch
 import torch.nn as nn
 import torchvision
+import logging
+
+logger = logging.getLogger(__name__)
 
 def crop(x, residual):
     _, _, H, W = x.shape 
@@ -29,25 +32,25 @@ class UNetBlock(nn.Module):
         # transform time embedding
         t = self.time_transform(t)
         t = t[(...,) + (None,)*2] # add h and width dimentions
-        print('time transform', t.shape, x.shape)
+        logger.debug('time transform %s %s', t.shape, x.shape)
 
         x = x+t
         x = self.conv0(x)
         x = self.relu(x)
-        print('block conv0+relu', x.shape)
+        logger.debug('block conv0+relu %s', x.shape)
         x = self.transform(x)
         saved_residual=x
-        print('block transform', x.shape)
+        logger.debug('block transform %s', x.shape)
 
         if residual is not None:
             cropped = crop(x, residual)
-            print('before crop', x.shape)
+            logger.debug('before crop %s', x.shape)
             x = torch.cat([x, cropped], dim=1)
-            print('after crop', x.shape)
+            logger.debug('after crop %s', x.shape)
 
         x = self.conv1(x)
         x = self.relu(x)
-        print('block conv1+relu', x.shape)
+        logger.debug('block conv1+relu %s', x.shape)
         return x, saved_residual
 
 
@@ -80,37 +83,37 @@ class UNet(nn.Module):
 
         # time embedding
         t = self.time_embed(x, timestep)
-        print('time embedding', t.shape)
+        logger.debug('time embedding %s', t.shape)
         t = self.time_embed_linear(t)
-        print('time embedding', t.shape)
+        logger.debug('time embedding %s', t.shape)
 
-        print('initial dimension', x.shape)
+        logger.debug('initial dimension %s', x.shape)
         x = self.conv0(x.float())
-        print('after conv0', x.shape)
+        logger.debug('after conv0 %s', x.shape)
         
         residuals = []
         for layer in self.down_blocks:
             (x, residual) = layer(x, t)
             residuals.append(residual)
-            # print('appended', x.shape)
+            # logger.debug('appended', x.shape)
 
         # for r in residuals:
-        #     print(r.shape)
+        #     logger.debug(r.shape)
 
         # we don't need the last residual connection
-        print('residual len', len(residuals))
+        logger.debug('residual len %s', len(residuals))
 
-        print('after down blocks', x.shape)
+        logger.debug('after down blocks%s ', x.shape)
 
         for layer in self.up_blocks:
             residual = residuals.pop()
-            # print('popped', residual.shape)
+            # logger.debug('popped', residual.shape)
             x, _ = layer(x, t, residual=residual)
 
-        print('shape after up_blocks', x.shape)
+        logger.debug('shape after up_blocks %s', x.shape)
         x = self.conv1(x)
-        print('shape after conv1', x.shape)
+        logger.debug('shape after conv1 %s', x.shape)
         x = self.output_conv(x)
-        print('shape after output conv', x.shape)
+        logger.debug('shape after output conv %s', x.shape)
         return x
         

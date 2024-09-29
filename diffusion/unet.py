@@ -1,3 +1,4 @@
+from position_embedding import PositionEmbedding
 import torch
 import torch.nn as nn
 import torchvision
@@ -7,8 +8,11 @@ def crop(x, residual):
     return torchvision.transforms.CenterCrop([H, W])(residual)
 
 class UNetBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, up=True):
+    def __init__(self, in_channels, out_channels, time_dim, up=True):
         super().__init__()
+
+        self.time_dim = time_dim
+        self.time_transform = nn.Linear(self.time_dim, in_channels)
 
         self.conv0 = nn.Conv2d(in_channels, in_channels, 3)
         self.conv1 = nn.Conv2d(in_channels, out_channels, 3)
@@ -19,7 +23,15 @@ class UNetBlock(nn.Module):
         else:
             self.transform = nn.MaxPool2d(2)
 
-    def forward(self, x, residual=None):
+    def forward(self, x, t, residual=None):
+        # TODO when should time embedding be applied?
+
+        # transform time embedding
+        t = self.time_transform(t)
+        t = t[(...,) + (None,)*2] # add h and width dimentions
+        print('time transform', t.shape, x.shape)
+
+        x = x+t
         x = self.conv0(x)
         x = self.relu(x)
         print('block conv0+relu', x.shape)
@@ -40,27 +52,40 @@ class UNetBlock(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, in_channels=3, out_channels=2):
+    def __init__(self, in_channels=3, out_channels=2, time_dim=32):
         super().__init__()
 
         down_channels = [64, 128, 256, 512, 1024]
         up_channels = [1024, 512, 256, 128, 64]
 
+        self.time_dim = time_dim
+
+        self.time_embed = nn.Sequential(
+            PositionEmbedding(self.time_dim),
+            nn.Linear(self.time_dim, self.time_dim),
+            nn.ReLU()
+        )
+
         self.conv0 = nn.Conv2d(in_channels, down_channels[0], 3, padding=0)
-        self.down_blocks = nn.ModuleList([UNetBlock(down_channels[i], down_channels[i+1], up=False) for i in range(len(down_channels)-1)])
-        self.up_blocks = nn.ModuleList([UNetBlock(up_channels[i], up_channels[i+1], up=True) for i in range(len(down_channels)-1)])
+        self.down_blocks = nn.ModuleList([UNetBlock(down_channels[i], down_channels[i+1], self.time_dim, up=False) for i in range(len(down_channels)-1)])
+        self.up_blocks = nn.ModuleList([UNetBlock(up_channels[i], up_channels[i+1], self.time_dim, up=True) for i in range(len(down_channels)-1)])
         self.conv1 = nn.Conv2d(up_channels[-1], up_channels[-1], 3, padding=0)
         self.output_conv = nn.Conv2d(up_channels[-1], out_channels, 1)
 
 
-    def forward(self, x):
+    def forward(self, x, timestep):
+
+        # time embedding
+        t = self.time_embed(timestep)
+        print('time embedding', t.shape)
+
         print('initial dimension', x.shape)
         x = self.conv0(x)
         print('after conv0', x.shape)
         
         residuals = []
         for layer in self.down_blocks:
-            (x, residual) = layer(x)
+            (x, residual) = layer(x, t)
             residuals.append(residual)
             # print('appended', x.shape)
 
@@ -75,7 +100,7 @@ class UNet(nn.Module):
         for layer in self.up_blocks:
             residual = residuals.pop()
             # print('popped', residual.shape)
-            x, _ = layer(x, residual=residual)
+            x, _ = layer(x, t, residual=residual)
 
         print('shape after up_blocks', x.shape)
         x = self.conv1(x)

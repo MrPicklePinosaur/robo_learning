@@ -11,6 +11,7 @@ class PositionEmbedding(nn.Module):
     def forward(self, time):
         half_dim = self.dim // 2
         embedding = torch.exp(-1 * math.log(10000) * torch.arange(half_dim, device=time.device)/(half_dim - 1))
+        print('forward pass position', time.shape, embedding.shape)
         embedding = time[:, None] * embedding[None, :]
         embedding = torch.stack((embedding.sin(), embedding.cos()), dim=1)
         embedding = embedding.flatten()

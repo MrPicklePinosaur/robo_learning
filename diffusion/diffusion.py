@@ -113,9 +113,10 @@ plt.show()
 '''
 
 x = torch.randn(1, 3, 572, 572)
-model = UNet(in_channels=3, out_channels=2)
+timestep = torch.zeros((1, 1))
+model = UNet(in_channels=3, out_channels=2, time_dim=32)
 print(model)
-model(x)
+model(x, timestep)
 
 
 # Training process

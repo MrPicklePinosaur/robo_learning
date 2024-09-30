@@ -16,10 +16,10 @@ def linear_beta_schedule(timesteps, start=0.0001, end=0.02):
 
 # Hyperparameters
 IMG_SIZE=64
-BATCH_SIZE=64
+BATCH_SIZE=256
 T=300
 EPOCHS=100
-LEARING_RATE=1e-3
+LEARING_RATE=1e-6
 
 # For use when saving model
 now = datetime.now()
@@ -37,11 +37,24 @@ alphas_overline = torch.cumprod(alphas, axis=0)
 A = torch.sqrt(alphas_overline)
 B = torch.sqrt(1-alphas_overline)
 
+def get_index_from_list(vals, t, x_shape):
+    """ 
+    Returns a specific index t of a passed list of values vals
+    while considering the batch dimension.
+    """
+    batch_size = t.shape[0]
+    # print(vals.shape, t.shape)
+    out = vals.gather(-1, t.squeeze(1).cpu())
+    return out.reshape(batch_size, *((1,) * (len(x_shape) - 1))).to(t.device)
+
 # x is a batch of images, t is the timestep of each image to sample at
 def sample_noisy_image(x, t):
     noise = torch.randn_like(x)
-    return A[t] * x + B[t] * noise, noise
-
+    sqrt_alphas_overline_t = get_index_from_list(torch.sqrt(alphas_overline), t, x.shape)
+    sqrt_one_minus_alphas_overline_t = get_index_from_list(torch.sqrt(1.-alphas_overline), t, x.shape)
+    # print(A.shape, A[t].view(BATCH_SIZE,1,1,1).shape, x.shape)
+    # return A[t].view(BATCH_SIZE,1,1,1) * x + B[t].view(BATCH_SIZE,1,1,1) * noise, noise
+    return sqrt_alphas_overline_t.to(device) * x.to(device) + sqrt_one_minus_alphas_overline_t.to(device) * noise.to(device), noise.to(device)
 
 # converts from a tensor to viewable image
 # removes the normalization that is done
@@ -89,14 +102,17 @@ def inference(checkpoint_path):
             if t > 1:
                 z  = torch.randn((1, 3, IMG_SIZE, IMG_SIZE))
             
-            predict = model(x_t, torch.tensor([[t]]))
+            t = torch.tensor([[t]])
+            predict = model(x_t, t)
             # print('predict', predict.shape)
-            sigma_t = 0 # TODO get the variance
-            x_t = 1/torch.sqrt(alphas[t]) * (x_t - (1-alphas[t])/torch.sqrt(1-alphas_overline[t]) * predict + sigma_t * z)
+            sigma_t = torch.sqrt(betas[t].view(1,1,1,1)) # TODO get the variance
+            # print('alphas', t.shape, alphas[t].view(1,1,1,1).shape)
+            x_t = 1/torch.sqrt(alphas[t].view(1,1,1,1)) * (x_t - (1-alphas[t].view(1,1,1,1))/torch.sqrt(1-alphas_overline[t].view(1,1,1,1)) * predict + sigma_t * z)
             # print('x_t', x_t.shape)
 
             # TODO this is pretty stupid
             if t in sample_indices:
+                print(t)
                 plt.subplot(1, image_count+1, fig_index)
                 # TODO make reverse_transformations work with batch
                 plt.imshow(reverse_transformations(x_t.squeeze(0)))
@@ -113,8 +129,6 @@ if __name__ == "__main__":
     # setup basic logger
     logger = logging.getLogger(__name__)
     logging.basicConfig(level=logging.INFO)
-
-    # Load dataset
 
     # Determine mean and variance of pixel values
     transformations = [
@@ -133,11 +147,15 @@ if __name__ == "__main__":
     if RECOMPUTE_NORMS:
         norm_mean, norm_std = normalize_dataset(dataloader, IMG_SIZE, IMG_SIZE)
 
+    print('norms computed', norm_mean, norm_std)
+
     # Apply the normalization transformations
     # transformations.append(transforms.Normalize(mean=norm_mean, std=norm_std))
     preprocess = transforms.Compose(transformations)
     dataset = AnimeFaces(img_dir='data', preprocess=preprocess)
-    dataset = Subset(dataset, range(BATCH_SIZE*10))
+    scaled_len = len(dataset)//BATCH_SIZE * BATCH_SIZE
+    # dataset = Subset(dataset, range(scaled_len)) # truncate to multiple of batch size
+    dataset = Subset(dataset, range(BATCH_SIZE*4)) # truncate to multiple of batch size
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
     # Apply forward diffusion
@@ -167,7 +185,7 @@ if __name__ == "__main__":
     # timestep = torch.zeros((1, 1))
     # model(x, timestep)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARING_RATE)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=LEARING_RATE)
     criterion = nn.MSELoss()
 
     # Training process
@@ -175,30 +193,32 @@ if __name__ == "__main__":
 
         total_loss = 0
         for i, batch in enumerate(dataloader):
+            model.train()
 
             optimizer.zero_grad()
 
             # sample random timestep
             t = torch.randint(0, T, (BATCH_SIZE, 1), device=device)
 
-            # TODO sample noise
             # print('batch shape', batch.shape)
-            e, _ = sample_noisy_image(batch, t)
+            e, noise = sample_noisy_image(batch, t)
             #e = torch.randint(0, 1, (BATCH_SIZE, 3, 256, 256), device=device).float()
 
             outputs = model(e, t)
-            loss = criterion(outputs, e)
+            loss = criterion(outputs, noise)
             total_loss += loss.item()
             loss.backward()
             optimizer.step()
             print(f'finished iteration {i+1}/{len(dataloader)}')
 
         # TODO log some progress and visualize
-        print(f'Completed Epoch {epoch}, Loss: {total_loss}')
+        print(f'Completed Epoch {epoch}, Loss: {total_loss/len(dataloader)}')
 
         # save model
         checkpoint = {
             'weights': model.state_dict(),
             'optimizer': optimizer.state_dict(),
+            'norm_mean': norm_mean,
+            'norm_std': norm_std,
         }
         torch.save(checkpoint, f'checkpoints/model_{timestamp}.pth')

@@ -80,7 +80,6 @@ class UNet(nn.Module):
 
     def forward(self, x, timestep):
 
-
         # time embedding
         t = self.time_embed(x, timestep)
         logger.debug('time embedding %s', t.shape)

@@ -1,3 +1,5 @@
+from schedule import Sampler, cosine_schedule
+import sys
 import torch
 import torch.nn as nn
 import numpy as np
@@ -10,14 +12,10 @@ from datetime import datetime
 from dataset import AnimeFaces
 from unet import UNet
 
-# TODO try other noise schedules
-def linear_beta_schedule(timesteps, start=0.0001, end=0.02):
-    return torch.linspace(start, end, timesteps)
-
 # Hyperparameters
 IMG_SIZE=64
 BATCH_SIZE=256
-T=300
+T=1000
 EPOCHS=100
 LEARING_RATE=1e-6
 
@@ -25,36 +23,7 @@ LEARING_RATE=1e-6
 now = datetime.now()
 timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
 
-'''
-x_t = sqrt(overline(alpha_t)) x_0 + sqrt(1 - overline(alpha_t)) epsilon
-A = sqrt(overline(alpha_t))
-B = sqrt(1 - overline(alpha_t))
-'''
-
-betas = linear_beta_schedule(T)
-alphas = 1 - betas
-alphas_overline = torch.cumprod(alphas, axis=0)
-A = torch.sqrt(alphas_overline)
-B = torch.sqrt(1-alphas_overline)
-
-def get_index_from_list(vals, t, x_shape):
-    """ 
-    Returns a specific index t of a passed list of values vals
-    while considering the batch dimension.
-    """
-    batch_size = t.shape[0]
-    # print(vals.shape, t.shape)
-    out = vals.gather(-1, t.squeeze(1).cpu())
-    return out.reshape(batch_size, *((1,) * (len(x_shape) - 1))).to(t.device)
-
-# x is a batch of images, t is the timestep of each image to sample at
-def sample_noisy_image(x, t):
-    noise = torch.randn_like(x)
-    sqrt_alphas_overline_t = get_index_from_list(torch.sqrt(alphas_overline), t, x.shape)
-    sqrt_one_minus_alphas_overline_t = get_index_from_list(torch.sqrt(1.-alphas_overline), t, x.shape)
-    # print(A.shape, A[t].view(BATCH_SIZE,1,1,1).shape, x.shape)
-    # return A[t].view(BATCH_SIZE,1,1,1) * x + B[t].view(BATCH_SIZE,1,1,1) * noise, noise
-    return sqrt_alphas_overline_t.to(device) * x.to(device) + sqrt_one_minus_alphas_overline_t.to(device) * noise.to(device), noise.to(device)
+cosine_sampler = Sampler(cosine_schedule(T))
 
 # converts from a tensor to viewable image
 # removes the normalization that is done
@@ -158,24 +127,27 @@ if __name__ == "__main__":
     dataset = Subset(dataset, range(BATCH_SIZE*4)) # truncate to multiple of batch size
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
+    # ================= SAMPLE
     # Apply forward diffusion
-    '''
-    image = next(iter(dataloader))[0] # grab some image
-    print(image.shape)
-    num_images = 10 # number of images to display in graph
+    original_image = next(iter(dataloader))[0].unsqueeze(0) # grab some image
+    print('image shape', original_image.shape)
+    num_images = 11 # number of images to display in graph
     step_size = int(T/num_images)
 
     plt.figure()
 
     fig_index = 1
     for t in range(0, T, step_size):
-        image, noise = forward_pass(image, t)
+        t = (torch.ones(1) * t).long()
+        image, noise = cosine_sampler.sample(original_image, t)
         plt.subplot(1, num_images+1, fig_index)
-        plt.imshow(reverse_transformations(image))
+        plt.imshow(reverse_transformations(image[0]))
+        plt.axis('off')
         fig_index += 1
 
     plt.show()
-    '''
+    sys.exit(0)
+    # ================= SAMPLE
 
     model = UNet(in_channels=3, out_channels=3, time_dim=BATCH_SIZE)
     print(model)
@@ -198,10 +170,10 @@ if __name__ == "__main__":
             optimizer.zero_grad()
 
             # sample random timestep
-            t = torch.randint(0, T, (BATCH_SIZE, 1), device=device)
+            t = torch.randint(0, T, (BATCH_SIZE, ), device=device)
 
             # print('batch shape', batch.shape)
-            e, noise = sample_noisy_image(batch, t)
+            e, noise = cosine_sampler.sample(batch, t)
             #e = torch.randint(0, 1, (BATCH_SIZE, 3, 256, 256), device=device).float()
 
             outputs = model(e, t)

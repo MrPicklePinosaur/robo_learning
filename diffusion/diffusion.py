@@ -1,4 +1,3 @@
-from schedule import Sampler, cosine_schedule
 import sys
 import torch
 import torch.nn as nn
@@ -11,6 +10,7 @@ from datetime import datetime
 
 from dataset import AnimeFaces
 from unet import UNet
+from schedule import Sampler, cosine_schedule
 
 # Hyperparameters
 IMG_SIZE=64

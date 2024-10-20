@@ -8,13 +8,20 @@ DDPM implementation on Anime Faces dataset
 
 [dataset](https://huggingface.co/datasets/huggan/anime-faces)
 
+## Showcase
+
+Some early epoch results
+<img src="media/gen1.png" width="50%"/>
+<img src="media/gen2.png" width="50%"/>
+
 ## TODO
 
-- [ ] improve the noise schedule to destroy image slower
+- [ ] improve the noise schedule to destroy image slower (cosine was buggy)
 - [x] double check training loop images (plot them)
-- [ ] double check the unet implementation rigorously
-- [ ] double check training code
 - [x] can try using pretrained unet (seems to have better loss convergence)
+- [ ] get my own UNET implementation working (currently the loss is not decreasing at all during training), most likely an issue with the residual connections
+- [ ] tune hyperparameters for better convergence
+- [ ] maybe use wandb to track experiments
 
 ## Resources
 
